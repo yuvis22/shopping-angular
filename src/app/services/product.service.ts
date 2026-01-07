@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
-import { map } from 'rxjs/operators';
+import { Observable, of } from 'rxjs';
+import { map, catchError } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 
 export interface Product {
@@ -25,9 +25,14 @@ export class ProductService {
   constructor(private http: HttpClient) {}
 
   getProducts(): Observable<Product[]> {
-    return this.http
-      .get<Product[]>(this.apiUrl)
-      .pipe(map((products) => products.map((p) => ({ ...p, id: p._id || p.id }))));
+    return this.http.get<Product[]>(this.apiUrl).pipe(
+      map((products) => products.map((p) => ({ ...p, id: p._id || p.id }))),
+      catchError((error) => {
+        console.error('Error fetching products:', error);
+        // Return empty array instead of erroring to prevent blank page
+        return of([]);
+      })
+    );
   }
 
   getProduct(id: string): Observable<Product | undefined> {

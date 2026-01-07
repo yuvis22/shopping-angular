@@ -1,53 +1,110 @@
 <div class="admin-container">
+  <!-- Header -->
   <div class="admin-header">
-    <h1>Admin Panel</h1>
-    <button class="btn btn-primary" (click)="openAddForm()" *ngIf="!showForm">
-      + Add New Product
+    <div class="header-content">
+      <h1>Product Management</h1>
+      <p class="subtitle">Manage your product catalog</p>
+    </div>
+    <button class="btn-primary" (click)="openAddForm()" *ngIf="!showForm">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <line x1="5" y1="12" x2="19" y2="12"></line>
+      </svg>
+      Add New Product
     </button>
   </div>
 
-  <div class="error-message" *ngIf="error">
+  <!-- Success/Error Messages -->
+  <div class="alert alert-error" *ngIf="apiError && !error">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="10"></circle>
+      <line x1="12" y1="8" x2="12" y2="12"></line>
+      <line x1="12" y1="16" x2="12.01" y2="16"></line>
+    </svg>
+    <div>
+      <strong>Connection Error</strong>
+      <p style="margin: 0.5rem 0 0 0; font-size: 0.875rem;">Failed to connect to backend server. Make sure the server is running on http://localhost:3000</p>
+      <p style="margin: 0.5rem 0 0 0; font-size: 0.875rem;">To start the server, run: <code style="background: rgba(0,0,0,0.1); padding: 0.25rem 0.5rem; border-radius: 4px;">cd server && npm run dev</code></p>
+    </div>
+  </div>
+
+  <div class="alert alert-error" *ngIf="error && !apiError">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="10"></circle>
+      <line x1="12" y1="8" x2="12" y2="12"></line>
+      <line x1="12" y1="16" x2="12.01" y2="16"></line>
+    </svg>
     {{ error }}
   </div>
 
+  <div class="alert alert-success" *ngIf="successMessage">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+      <polyline points="22 4 12 14.01 9 11.01"></polyline>
+    </svg>
+    {{ successMessage }}
+  </div>
+
   <!-- Product Form -->
-  <div class="product-form-container" *ngIf="showForm">
-    <h2>{{ editingProduct ? 'Edit Product' : 'Add New Product' }}</h2>
+  <div class="form-card" *ngIf="showForm">
+    <div class="form-header">
+      <h2>{{ editingProduct ? 'Edit Product' : 'Create New Product' }}</h2>
+      <button class="close-btn" (click)="cancelForm()" [disabled]="loading">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+
     <form (ngSubmit)="submitForm()" class="product-form">
-      <div class="form-group">
-        <label for="name">Product Name *</label>
-        <input
-          type="text"
-          id="name"
-          [(ngModel)]="productForm.name"
-          name="name"
-          required
-          class="form-control"
-        />
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="name">
+            Product Name <span class="required">*</span>
+          </label>
+          <input
+            type="text"
+            id="name"
+            [(ngModel)]="productForm.name"
+            name="name"
+            required
+            placeholder="Enter product name"
+            class="form-input"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="price">
+            Price <span class="required">*</span>
+          </label>
+          <div class="input-with-icon">
+            <span class="currency">$</span>
+            <input
+              type="number"
+              id="price"
+              [(ngModel)]="productForm.price"
+              name="price"
+              step="0.01"
+              min="0"
+              required
+              placeholder="0.00"
+              class="form-input"
+            />
+          </div>
+        </div>
       </div>
 
       <div class="form-group">
-        <label for="price">Price *</label>
-        <input
-          type="number"
-          id="price"
-          [(ngModel)]="productForm.price"
-          name="price"
-          step="0.01"
-          min="0"
-          required
-          class="form-control"
-        />
-      </div>
-
-      <div class="form-group">
-        <label for="category">Category *</label>
+        <label for="category">
+          Category <span class="required">*</span>
+        </label>
         <select
           id="category"
           [(ngModel)]="productForm.category"
           name="category"
           required
-          class="form-control"
+          class="form-input"
         >
           <option value="">Select a category</option>
           <option *ngFor="let cat of categories" [value]="cat">{{ cat }}</option>
@@ -55,72 +112,129 @@
       </div>
 
       <div class="form-group">
-        <label for="description">Description *</label>
+        <label for="description">
+          Description <span class="required">*</span>
+        </label>
         <textarea
           id="description"
           [(ngModel)]="productForm.description"
           name="description"
-          rows="4"
+          rows="5"
           required
-          class="form-control"
+          placeholder="Describe your product..."
+          class="form-input"
         ></textarea>
       </div>
 
       <div class="form-group">
-        <label for="image">Product Image *</label>
-        <input
-          type="file"
-          id="image"
-          (change)="onFileSelected($event)"
-          accept="image/*"
-          [required]="!editingProduct"
-          class="form-control"
-        />
-        <small *ngIf="editingProduct">Leave empty to keep current image</small>
+        <label for="image">
+          Product Image <span class="required" *ngIf="!editingProduct">*</span>
+        </label>
+        <div class="image-upload-area" [class.has-image]="imagePreview || (editingProduct && !productForm.image)">
+          <input
+            type="file"
+            id="image"
+            (change)="onFileSelected($event)"
+            accept="image/*"
+            [required]="!editingProduct"
+            class="file-input"
+          />
+          <div class="upload-content" *ngIf="!imagePreview && (!editingProduct || !productForm.image)">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="17 8 12 3 7 8"></polyline>
+              <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+            <p>Click to upload or drag and drop</p>
+            <span class="file-hint">PNG, JPG, GIF up to 10MB</span>
+          </div>
+          <div class="image-preview" *ngIf="imagePreview || (editingProduct && !productForm.image)">
+            <img [src]="imagePreview || (editingProduct?.imageUrl)" [alt]="productForm.name || 'Preview'" />
+            <button type="button" class="remove-image" (click)="removeImage()" *ngIf="imagePreview">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <small class="form-hint" *ngIf="editingProduct">Leave empty to keep current image</small>
       </div>
 
       <div class="form-actions">
-        <button type="submit" class="btn btn-primary" [disabled]="loading">
-          {{ loading ? 'Saving...' : (editingProduct ? 'Update Product' : 'Create Product') }}
-        </button>
-        <button type="button" class="btn btn-secondary" (click)="cancelForm()" [disabled]="loading">
+        <button type="button" class="btn-secondary" (click)="cancelForm()" [disabled]="loading">
           Cancel
+        </button>
+        <button type="submit" class="btn-primary" [disabled]="loading">
+          <span *ngIf="loading" class="spinner"></span>
+          {{ loading ? 'Saving...' : (editingProduct ? 'Update Product' : 'Create Product') }}
         </button>
       </div>
     </form>
   </div>
 
   <!-- Products List -->
-  <div class="products-table" *ngIf="!showForm">
-    <table>
-      <thead>
-        <tr>
-          <th>Image</th>
-          <th>Name</th>
-          <th>Category</th>
-          <th>Price</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let product of products$ | async">
-          <td>
-            <img [src]="product.imageUrl" [alt]="product.name" class="table-image" />
-          </td>
-          <td>{{ product.name }}</td>
-          <td>{{ product.category }}</td>
-          <td>${{ product.price }}</td>
-          <td class="actions">
-            <button class="btn btn-sm btn-edit" (click)="openEditForm(product)">
-              Edit
-            </button>
-            <button class="btn btn-sm btn-delete" (click)="deleteProduct(product)">
-              Delete
-            </button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+  <div class="products-section" *ngIf="!showForm">
+    <div class="products-header">
+      <h3>All Products</h3>
+      <div class="products-count" *ngIf="products$ | async as products">
+        {{ products.length }} {{ products.length === 1 ? 'product' : 'products' }}
+      </div>
+    </div>
+
+    <div class="products-grid" *ngIf="products$ | async as products; else loadingState">
+      <div class="product-card" *ngFor="let product of products">
+        <div class="product-image">
+          <img [src]="product.imageUrl" [alt]="product.name" />
+        </div>
+        <div class="product-info">
+          <h4 class="product-name">{{ product.name }}</h4>
+          <p class="product-category">{{ product.category }}</p>
+          <p class="product-description">{{ product.description | slice:0:80 }}{{ product.description.length > 80 ? '...' : '' }}</p>
+          <div class="product-footer">
+            <span class="product-price">${{ product.price | number:'1.2-2' }}</span>
+            <div class="product-actions">
+              <button class="btn-icon btn-edit" (click)="openEditForm(product)" title="Edit">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+              </button>
+              <button class="btn-icon btn-delete" (click)="deleteProduct(product)" title="Delete">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <ng-template #loadingState>
+      <div class="loading-state">
+        <div class="spinner-large"></div>
+        <p>Loading products...</p>
+      </div>
+    </ng-template>
+
+    <div class="empty-state" *ngIf="(products$ | async)?.length === 0">
+      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+        <line x1="9" y1="3" x2="9" y2="21"></line>
+        <line x1="3" y1="9" x2="21" y2="9"></line>
+      </svg>
+      <h3>No products yet</h3>
+      <p>Get started by adding your first product</p>
+      <button class="btn-primary" (click)="openAddForm()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+        Add Your First Product
+      </button>
+    </div>
   </div>
 </div>
 

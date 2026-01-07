@@ -76,21 +76,52 @@ export class AuthService {
     }
   }
 
-  getClerk(): any {
+  async getClerk(): Promise<any> {
+    // Wait for Clerk to finish loading if it's still loading
+    if (this.clerkLoading) {
+      await this.clerkLoading;
+    }
     return this.clerkInstance || (window as any).Clerk;
   }
 
   async getToken(): Promise<string | null> {
-    const clerk = this.getClerk();
-    if (clerk) {
-      const session = await clerk.session;
-      return session?.getToken() || null;
+    try {
+      // Wait for Clerk to be fully loaded
+      const clerk = await this.getClerk();
+      if (!clerk) {
+        console.error('Clerk instance not available');
+        return null;
+      }
+
+      // Make sure Clerk is loaded
+      if (!clerk.loaded) {
+        await clerk.load();
+      }
+
+      // Get the current session - Clerk.js v5 uses clerk.session
+      const session = clerk.session;
+      if (!session) {
+        console.error('No active session found. User may not be signed in.');
+        return null;
+      }
+
+      // Get the token from the session
+      // In Clerk.js, session.getToken() returns a Promise
+      const token = await session.getToken();
+      if (!token) {
+        console.error('Failed to get token from session');
+        return null;
+      }
+
+      return token;
+    } catch (error) {
+      console.error('Error getting token:', error);
+      return null;
     }
-    return null;
   }
 
   async signOut(): Promise<void> {
-    const clerk = this.getClerk();
+    const clerk = await this.getClerk();
     if (clerk) {
       await clerk.signOut();
       this.userSubject.next(null);

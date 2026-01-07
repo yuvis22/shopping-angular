@@ -51,8 +51,18 @@ router.post(
       let imageUrl = '';
 
       if (req.file) {
-        const fileName = `${Date.now()}-${req.file.originalname}`;
-        imageUrl = await uploadFileToB2(fileName, req.file.buffer, req.file.mimetype);
+        try {
+          const fileName = `${Date.now()}-${req.file.originalname}`;
+          imageUrl = await uploadFileToB2(fileName, req.file.buffer, req.file.mimetype);
+        } catch (b2Error: any) {
+          console.error('Backblaze B2 upload error:', b2Error);
+          res.status(500).json({
+            error:
+              'Failed to upload image to Backblaze B2. Please check your B2 credentials in server/.env file.',
+            details: b2Error.message,
+          });
+          return;
+        }
       } else {
         res.status(400).json({ error: 'Image is required' });
         return;
@@ -108,8 +118,18 @@ router.put(
           console.error('Error deleting old file:', error);
         }
 
-        const fileName = `${Date.now()}-${req.file.originalname}`;
-        product.imageUrl = await uploadFileToB2(fileName, req.file.buffer, req.file.mimetype);
+        try {
+          const fileName = `${Date.now()}-${req.file.originalname}`;
+          product.imageUrl = await uploadFileToB2(fileName, req.file.buffer, req.file.mimetype);
+        } catch (b2Error: any) {
+          console.error('Backblaze B2 upload error:', b2Error);
+          res.status(500).json({
+            error:
+              'Failed to upload image to Backblaze B2. Please check your B2 credentials in server/.env file.',
+            details: b2Error.message,
+          });
+          return;
+        }
       }
 
       await product.save();

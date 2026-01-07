@@ -3,7 +3,8 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ProductService, Product } from '../services/product.service';
 import { AuthService } from '../services/auth.service';
-import { Observable } from 'rxjs';
+import { Observable, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 
 @Component({
   selector: 'app-admin',
@@ -28,11 +29,24 @@ export class AdminComponent implements OnInit {
   categories = ['Furniture', 'Electronics', 'Lighting', 'Decor', 'Accessories', 'Other'];
   loading = false;
   error = '';
+  successMessage = '';
+  imagePreview: string | null = null;
+  apiError = false;
 
   constructor(
     private productService: ProductService,
     private authService: AuthService
-  ) {}
+  ) {
+    // Initialize products$ in constructor to prevent blank page
+    this.products$ = this.productService.getProducts().pipe(
+      catchError((error) => {
+        console.error('Error loading products:', error);
+        this.apiError = true;
+        this.error = 'Failed to load products. Make sure the backend server is running on http://localhost:3000';
+        return of([]);
+      })
+    );
+  }
 
   ngOnInit(): void {
     this.loadProducts();
@@ -44,7 +58,10 @@ export class AdminComponent implements OnInit {
 
   async getToken(): Promise<string> {
     const token = await this.authService.getToken();
-    return token || '';
+    if (!token) {
+      throw new Error('No authentication token available. Please sign in again.');
+    }
+    return token;
   }
 
   openAddForm(): void {
@@ -56,8 +73,10 @@ export class AdminComponent implements OnInit {
       category: '',
       image: null
     };
+    this.imagePreview = null;
     this.showForm = true;
     this.error = '';
+    this.successMessage = '';
   }
 
   openEditForm(product: Product): void {
@@ -69,20 +88,60 @@ export class AdminComponent implements OnInit {
       category: product.category,
       image: null
     };
+    this.imagePreview = null;
     this.showForm = true;
     this.error = '';
+    this.successMessage = '';
   }
 
   onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     if (input.files && input.files[0]) {
-      this.productForm.image = input.files[0];
+      const file = input.files[0];
+      this.productForm.image = file;
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onload = (e: any) => {
+        this.imagePreview = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
+  removeImage(): void {
+    this.productForm.image = null;
+    this.imagePreview = null;
+    const input = document.getElementById('image') as HTMLInputElement;
+    if (input) {
+      input.value = '';
     }
   }
 
   async submitForm(): Promise<void> {
-    if (!this.productForm.name || !this.productForm.price || !this.productForm.description || !this.productForm.category) {
-      this.error = 'Please fill in all required fields';
+    // Validate required fields
+    const name = (this.productForm.name || '').trim();
+    const description = (this.productForm.description || '').trim();
+    const category = (this.productForm.category || '').trim();
+    const price = this.productForm.price;
+
+    if (!name) {
+      this.error = 'Please enter a product name';
+      return;
+    }
+
+    if (price === null || price === undefined || price < 0) {
+      this.error = 'Please enter a valid price (must be 0 or greater)';
+      return;
+    }
+
+    if (!description) {
+      this.error = 'Please enter a product description';
+      return;
+    }
+
+    if (!category) {
+      this.error = 'Please select a category';
       return;
     }
 
@@ -95,12 +154,20 @@ export class AdminComponent implements OnInit {
     this.error = '';
 
     try {
-      const token = await this.getToken();
+      let token: string;
+      try {
+        token = await this.getToken();
+      } catch (tokenError: any) {
+        this.error = tokenError.message || 'Authentication failed. Please sign in again.';
+        this.loading = false;
+        return;
+      }
+
       const formData = new FormData();
-      formData.append('name', this.productForm.name);
-      formData.append('price', this.productForm.price.toString());
-      formData.append('description', this.productForm.description);
-      formData.append('category', this.productForm.category);
+      formData.append('name', name);
+      formData.append('price', price.toString());
+      formData.append('description', description);
+      formData.append('category', category);
       
       if (this.productForm.image) {
         formData.append('image', this.productForm.image);
@@ -113,6 +180,14 @@ export class AdminComponent implements OnInit {
       }
 
       this.loadProducts();
+      this.successMessage = this.editingProduct ? 'Product updated successfully!' : 'Product created successfully!';
+      this.error = '';
+      
+      // Auto-hide success message after 3 seconds
+      setTimeout(() => {
+        this.successMessage = '';
+      }, 3000);
+      
       this.showForm = false;
       this.productForm = {
         name: '',
@@ -121,8 +196,10 @@ export class AdminComponent implements OnInit {
         category: '',
         image: null
       };
+      this.imagePreview = null;
     } catch (error: any) {
       this.error = error.error?.error || 'Failed to save product';
+      this.successMessage = '';
       console.error('Error saving product:', error);
     } finally {
       this.loading = false;
@@ -135,11 +212,26 @@ export class AdminComponent implements OnInit {
     }
 
     try {
-      const token = await this.getToken();
+      let token: string;
+      try {
+        token = await this.getToken();
+      } catch (tokenError: any) {
+        this.error = tokenError.message || 'Authentication failed. Please sign in again.';
+        return;
+      }
+
       await this.productService.deleteProduct(product._id || product.id || '', token).toPromise();
       this.loadProducts();
+      this.successMessage = 'Product deleted successfully!';
+      this.error = '';
+      
+      // Auto-hide success message after 3 seconds
+      setTimeout(() => {
+        this.successMessage = '';
+      }, 3000);
     } catch (error: any) {
       this.error = error.error?.error || 'Failed to delete product';
+      this.successMessage = '';
       console.error('Error deleting product:', error);
     }
   }
@@ -154,7 +246,9 @@ export class AdminComponent implements OnInit {
       category: '',
       image: null
     };
+    this.imagePreview = null;
     this.error = '';
+    this.successMessage = '';
   }
 }
 
