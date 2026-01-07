@@ -1,0 +1,23 @@
+<header class="header">
+  <div class="container header-content">
+    <a routerLink="/" class="logo">
+      ShopStyle
+    </a>
+    
+    <nav class="nav">
+      <a routerLink="/" class="nav-link">Products</a>
+      <a routerLink="/cart" class="cart-btn">
+        Cart
+        <span class="badge" *ngIf="(cartCount$ | async) as count">{{ count }}</span>
+      </a>
+      
+      <ng-container *ngIf="(user$ | async) as user; else notAuthenticated">
+        <a routerLink="/admin" class="nav-link" *ngIf="(isAdmin$ | async)">Admin</a>
+        <button class="btn btn-outline" (click)="signOut()">Sign Out</button>
+      </ng-container>
+      <ng-template #notAuthenticated>
+        <button class="btn btn-primary" (click)="signIn()">Sign In</button>
+      </ng-template>
+    </nav>
+  </div>
+</header>

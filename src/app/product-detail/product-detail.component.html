@@ -1,0 +1,29 @@
+<div class="product-detail" *ngIf="product$ | async as product; else loading">
+  <div class="image-section">
+    <img [src]="product.imageUrl" [alt]="product.name" class="detail-image">
+  </div>
+  
+  <div class="info-section">
+    <div class="breadcrumbs">
+      <a routerLink="/" class="back-link">← Back to Products</a>
+    </div>
+    
+    <div class="category-tag">{{ product.category }}</div>
+    <h1 class="product-title">{{ product.name }}</h1>
+    <div class="product-price">\${{ product.price }}</div>
+    
+    <p class="product-description">{{ product.description }}</p>
+    
+    <div class="actions">
+      <button class="btn btn-primary btn-lg" (click)="addToCart(product)">
+        Add to Cart
+      </button>
+    </div>
+  </div>
+</div>
+
+<ng-template #loading>
+  <div class="loading-state">
+    <p>Loading product details...</p>
+  </div>
+</ng-template>

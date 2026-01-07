@@ -1,0 +1,126 @@
+<div class="admin-container">
+  <div class="admin-header">
+    <h1>Admin Panel</h1>
+    <button class="btn btn-primary" (click)="openAddForm()" *ngIf="!showForm">
+      + Add New Product
+    </button>
+  </div>
+
+  <div class="error-message" *ngIf="error">
+    {{ error }}
+  </div>
+
+  <!-- Product Form -->
+  <div class="product-form-container" *ngIf="showForm">
+    <h2>{{ editingProduct ? 'Edit Product' : 'Add New Product' }}</h2>
+    <form (ngSubmit)="submitForm()" class="product-form">
+      <div class="form-group">
+        <label for="name">Product Name *</label>
+        <input
+          type="text"
+          id="name"
+          [(ngModel)]="productForm.name"
+          name="name"
+          required
+          class="form-control"
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="price">Price *</label>
+        <input
+          type="number"
+          id="price"
+          [(ngModel)]="productForm.price"
+          name="price"
+          step="0.01"
+          min="0"
+          required
+          class="form-control"
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="category">Category *</label>
+        <select
+          id="category"
+          [(ngModel)]="productForm.category"
+          name="category"
+          required
+          class="form-control"
+        >
+          <option value="">Select a category</option>
+          <option *ngFor="let cat of categories" [value]="cat">{{ cat }}</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="description">Description *</label>
+        <textarea
+          id="description"
+          [(ngModel)]="productForm.description"
+          name="description"
+          rows="4"
+          required
+          class="form-control"
+        ></textarea>
+      </div>
+
+      <div class="form-group">
+        <label for="image">Product Image *</label>
+        <input
+          type="file"
+          id="image"
+          (change)="onFileSelected($event)"
+          accept="image/*"
+          [required]="!editingProduct"
+          class="form-control"
+        />
+        <small *ngIf="editingProduct">Leave empty to keep current image</small>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary" [disabled]="loading">
+          {{ loading ? 'Saving...' : (editingProduct ? 'Update Product' : 'Create Product') }}
+        </button>
+        <button type="button" class="btn btn-secondary" (click)="cancelForm()" [disabled]="loading">
+          Cancel
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Products List -->
+  <div class="products-table" *ngIf="!showForm">
+    <table>
+      <thead>
+        <tr>
+          <th>Image</th>
+          <th>Name</th>
+          <th>Category</th>
+          <th>Price</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let product of products$ | async">
+          <td>
+            <img [src]="product.imageUrl" [alt]="product.name" class="table-image" />
+          </td>
+          <td>{{ product.name }}</td>
+          <td>{{ product.category }}</td>
+          <td>${{ product.price }}</td>
+          <td class="actions">
+            <button class="btn btn-sm btn-edit" (click)="openEditForm(product)">
+              Edit
+            </button>
+            <button class="btn btn-sm btn-delete" (click)="deleteProduct(product)">
+              Delete
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+

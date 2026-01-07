@@ -1,0 +1,15 @@
+<div class="card" [routerLink]="['/product', product.id]">
+  <div class="image-container">
+    <img [src]="product.imageUrl" [alt]="product.name" class="product-image">
+  </div>
+  <div class="card-body">
+    <div class="category">{{ product.category }}</div>
+    <h3 class="title">{{ product.name }}</h3>
+    <div class="footer">
+      <span class="price">\${{ product.price }}</span>
+      <button class="btn btn-primary add-btn" (click)="onAddToCart($event)">
+        Add
+      </button>
+    </div>
+  </div>
+</div>

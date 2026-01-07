@@ -1,0 +1,151 @@
+.cart-container {
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.page-title {
+    margin-bottom: 2rem;
+}
+
+.cart-layout {
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+.cart-empty {
+    text-align: center;
+    padding: 4rem 2rem;
+    background-color: white;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+}
+
+.cart-empty p {
+    color: var(--text-secondary);
+    font-size: 1.2rem;
+    margin-bottom: 2rem;
+}
+
+.cart-content {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2rem;
+}
+
+@media (min-width: 900px) {
+    .cart-content {
+        grid-template-columns: 2fr 1fr;
+    }
+}
+
+.cart-items {
+    background-color: white;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+}
+
+.cart-item {
+    display: flex;
+    align-items: center;
+    padding: 1.5rem;
+    border-bottom: 1px solid #e2e8f0;
+    gap: 1.5rem;
+}
+
+.cart-item:last-child {
+    border-bottom: none;
+}
+
+.item-image {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: var(--radius-md);
+    background-color: #f1f5f9;
+}
+
+.item-details {
+    flex-grow: 1;
+}
+
+.item-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.item-price {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.item-total {
+    font-weight: 700;
+    color: var(--primary);
+    min-width: 80px;
+    text-align: right;
+}
+
+.remove-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 0.5rem;
+    margin-left: 0.5rem;
+    line-height: 1;
+}
+
+.remove-btn:hover {
+    color: var(--accent);
+}
+
+.cart-summary {
+    background-color: white;
+    padding: 1.5rem;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    height: fit-content;
+}
+
+.summary-title {
+    font-size: 1.2rem;
+    margin-bottom: 1.5rem;
+}
+
+.summary-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+    color: var(--text-secondary);
+}
+
+.summary-divider {
+    height: 1px;
+    background-color: #e2e8f0;
+    margin: 1.5rem 0;
+}
+
+.summary-row.total {
+    color: var(--text-main);
+    font-weight: 700;
+    font-size: 1.2rem;
+    margin-bottom: 2rem;
+}
+
+.checkout-btn {
+    width: 100%;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(5px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
