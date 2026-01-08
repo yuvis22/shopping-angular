@@ -17,6 +17,8 @@ export class HeaderComponent implements OnInit {
   cartCount$: Observable<number>;
   user$: Observable<any>;
   isAdmin$: Observable<boolean>;
+  isSigningIn = false;
+  isSigningOut = false;
 
   constructor(
     private cartService: CartService,
@@ -32,13 +34,32 @@ export class HeaderComponent implements OnInit {
 
   ngOnInit(): void {}
 
-  signIn(): void {
-    this.authService.openSignIn().catch(error => {
+  async signIn(): Promise<void> {
+    if (this.isSigningIn) return;
+    
+    this.isSigningIn = true;
+    try {
+      await this.authService.openSignIn();
+    } catch (error) {
       console.error('Sign in error:', error);
-    });
+    } finally {
+      // Reset after a delay to allow Clerk modal to open
+      setTimeout(() => {
+        this.isSigningIn = false;
+      }, 500);
+    }
   }
 
-  signOut(): void {
-    this.authService.signOut();
+  async signOut(): Promise<void> {
+    if (this.isSigningOut) return;
+    
+    this.isSigningOut = true;
+    try {
+      await this.authService.signOut();
+    } catch (error) {
+      console.error('Sign out error:', error);
+    } finally {
+      this.isSigningOut = false;
+    }
   }
 }

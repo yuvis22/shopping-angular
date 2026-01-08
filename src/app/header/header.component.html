@@ -13,10 +13,24 @@
       
       <ng-container *ngIf="(user$ | async) as user; else notAuthenticated">
         <a routerLink="/admin" class="nav-link" *ngIf="(isAdmin$ | async)">Admin</a>
-        <button class="btn btn-outline" (click)="signOut()">Sign Out</button>
+        <button 
+          class="btn btn-outline" 
+          (click)="signOut()" 
+          [disabled]="isSigningOut"
+        >
+          <span *ngIf="!isSigningOut">Sign Out</span>
+          <span *ngIf="isSigningOut">Signing out...</span>
+        </button>
       </ng-container>
       <ng-template #notAuthenticated>
-        <button class="btn btn-primary" (click)="signIn()">Sign In</button>
+        <button 
+          class="btn btn-primary" 
+          (click)="signIn()" 
+          [disabled]="isSigningIn"
+        >
+          <span *ngIf="!isSigningIn">Sign In</span>
+          <span *ngIf="isSigningIn">Opening...</span>
+        </button>
       </ng-template>
     </nav>
   </div>

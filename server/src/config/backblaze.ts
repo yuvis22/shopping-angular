@@ -159,15 +159,30 @@ export const uploadFileToB2 = async (
     }
 
     // For private buckets / CORS, we should use our own proxy
-    // Format: /api/images/{filePath} (which is products/filename)
-    // We only need the filename part since our proxy assumes 'products/' prefix or we pass the full path
-    
+    // Format: {API_URL}/api/images/{fileName}
     // The filename passed to this function is "products/timestamp-name"
-    // So we want the URL to be /api/images/timestamp-name
+    // So we want the URL to be {API_URL}/api/images/timestamp-name
     const fileNameOnly = filePath.replace('products/', '');
-    const proxyUrl = `/api/images/${fileNameOnly}`;
+    
+    // Get API base URL from environment or use default
+    // In production, this should be the Render backend URL
+    // In development, use localhost:3000
+    const apiBaseUrl = process.env.API_BASE_URL || 
+                      (process.env.NODE_ENV === 'production' 
+                        ? 'https://shopping-angular-li9h.onrender.com'
+                        : 'http://localhost:3000');
+    
+    const proxyUrl = `${apiBaseUrl}/api/images/${fileNameOnly}`;
 
     console.log('📎 Constructed proxy URL:', proxyUrl);
+    console.log('File details:', {
+      fileId: fileId,
+      fileName: filePath,
+      fileNameOnly: fileNameOnly,
+      bucketName: bucketName,
+      apiBaseUrl: apiBaseUrl,
+      fullUrl: proxyUrl,
+    });
     
     return proxyUrl;
   } catch (error: any) {

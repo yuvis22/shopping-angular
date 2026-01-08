@@ -90,3 +90,5 @@ async function validateB2Config() {
 
 validateB2Config();
 
+
+

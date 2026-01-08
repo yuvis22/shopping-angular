@@ -44,18 +44,37 @@ export class AuthService {
       return clerk.load().then(() => {
         console.log('✅ Clerk loaded successfully');
         (window as any).clerkReady = true;
+        
+        // Update user state immediately
         this.updateUser(clerk);
         
-        // Listen for user changes
-        if (typeof clerk.addListener === 'function') {
-          clerk.addListener((user: any) => {
-            this.userSubject.next(user);
-          });
+        // Listen for Clerk events if available
+        // Clerk.js v5 may use different event mechanisms
+        if (clerk.addListener && typeof clerk.addListener === 'function') {
+          try {
+            clerk.addListener((event: any) => {
+              console.log('🔔 Clerk event received:', event);
+              this.updateUser(clerk);
+            });
+          } catch (error) {
+            console.warn('Could not set up Clerk event listener:', error);
+          }
         }
         
-        if (clerk.user) {
-          this.userSubject.next(clerk.user);
-        }
+        // Set up a polling mechanism as fallback to check for user changes
+        // This ensures we catch sign in/sign out even if events don't fire
+        // Poll every 2 seconds (less aggressive than 1 second)
+        const pollInterval = setInterval(() => {
+          if (clerk && clerk.loaded) {
+            this.updateUser(clerk);
+          } else {
+            // If Clerk is no longer available, clear the interval
+            clearInterval(pollInterval);
+          }
+        }, 2000);
+        
+        // Store interval ID for cleanup if needed
+        (window as any).clerkPollInterval = pollInterval;
         
         return clerk;
       }).catch((error: any) => {
@@ -71,8 +90,32 @@ export class AuthService {
   }
 
   private updateUser(clerk: any): void {
-    if (clerk.user) {
-      this.userSubject.next(clerk.user);
+    try {
+      if (!clerk) {
+        this.userSubject.next(null);
+        return;
+      }
+      
+      const currentUser = clerk.user || null;
+      const currentValue = this.userSubject.value;
+      
+      // Compare user IDs to detect actual changes (not just reference changes)
+      const currentUserId = currentUser?.id || null;
+      const previousUserId = currentValue?.id || null;
+      
+      // Only update if user state actually changed
+      if (currentUserId !== previousUserId) {
+        if (currentUser) {
+          console.log('👤 User signed in:', currentUser.id);
+        } else {
+          console.log('👤 User signed out');
+        }
+        this.userSubject.next(currentUser);
+      }
+    } catch (error) {
+      console.error('Error updating user:', error);
+      // On error, set user to null as fallback
+      this.userSubject.next(null);
     }
   }
 
@@ -121,36 +164,72 @@ export class AuthService {
   }
 
   async signOut(): Promise<void> {
-    const clerk = await this.getClerk();
-    if (clerk) {
+    try {
+      const clerk = await this.getClerk();
+      if (!clerk) {
+        console.error('Clerk instance not available for sign out');
+        return;
+      }
+      
+      // Make sure Clerk is loaded
+      if (!clerk.loaded) {
+        await clerk.load();
+      }
+      
+      console.log('🚪 Signing out...');
       await clerk.signOut();
+      
+      // Update user state immediately
+      this.userSubject.next(null);
+      console.log('✅ Signed out successfully');
+    } catch (error) {
+      console.error('❌ Error signing out:', error);
+      // Still update user state to null on error
       this.userSubject.next(null);
     }
   }
 
   async openSignIn(): Promise<void> {
-    // Wait for Clerk to finish loading if it's still loading
-    if (this.clerkLoading) {
-      await this.clerkLoading;
-    }
-    
-    const clerk = this.clerkInstance || (window as any).clerkInstance || (window as any).Clerk;
-    
-    if (clerk && typeof clerk.openSignIn === 'function') {
-      try {
-        clerk.openSignIn();
-      } catch (error) {
-        console.error('Error opening sign in:', error);
-        alert('Failed to open sign in. Please try again.');
+    try {
+      // Wait for Clerk to finish loading if it's still loading
+      if (this.clerkLoading) {
+        await this.clerkLoading;
       }
-    } else {
-      console.error('Clerk not available:', {
-        hasInstance: !!this.clerkInstance,
-        hasWindowInstance: !!(window as any).clerkInstance,
-        hasWindowClerk: !!(window as any).Clerk,
-        clerkReady: (window as any).clerkReady
-      });
-      alert('Clerk authentication is not ready. Please refresh the page.');
+      
+      const clerk = await this.getClerk();
+      
+      if (!clerk) {
+        console.error('Clerk instance not available');
+        alert('Clerk authentication is not ready. Please refresh the page.');
+        return;
+      }
+      
+      // Make sure Clerk is loaded
+      if (!clerk.loaded) {
+        await clerk.load();
+      }
+      
+      // Check if user is already signed in
+      if (clerk.user) {
+        console.log('User is already signed in');
+        this.updateUser(clerk);
+        return;
+      }
+      
+      console.log('🔐 Opening sign in modal...');
+      
+      // Open sign in modal
+      if (typeof clerk.openSignIn === 'function') {
+        await clerk.openSignIn();
+        // Update user state after opening (Clerk will handle the modal)
+        // We'll rely on the interval check to update state after successful sign in
+      } else {
+        console.error('openSignIn method not available on Clerk instance');
+        alert('Sign in is not available. Please refresh the page.');
+      }
+    } catch (error) {
+      console.error('❌ Error opening sign in:', error);
+      alert('Failed to open sign in. Please try again.');
     }
   }
 
