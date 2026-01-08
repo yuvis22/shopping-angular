@@ -10,6 +10,7 @@
     "type-check": "tsc --noEmit",
     "set-admin": "tsx src/scripts/set-admin.ts",
     "validate-b2": "tsx src/scripts/validate-b2.ts",
+    "seed": "tsx src/scripts/seed-products.ts",
     "postinstall": "npm run build"
   },
   "dependencies": {
