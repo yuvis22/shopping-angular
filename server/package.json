@@ -9,6 +9,7 @@
     "build": "tsc",
     "type-check": "tsc --noEmit",
     "set-admin": "tsx src/scripts/set-admin.ts",
+    "validate-b2": "tsx src/scripts/validate-b2.ts",
     "postinstall": "npm run build"
   },
   "dependencies": {

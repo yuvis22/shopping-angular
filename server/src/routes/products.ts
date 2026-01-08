@@ -11,7 +11,25 @@ const upload = multer({ storage: multer.memoryStorage() });
 router.get('/', async (req, res) => {
   try {
     const products = await Product.find().sort({ createdAt: -1 });
-    res.json(products);
+
+    // Transform B2 URLs to proxy URLs
+    const transformedProducts = products.map(product => {
+      const p = product.toObject();
+      // Check for any B2 URL (standard or S3-compatible style)
+      if (p.imageUrl && (p.imageUrl.includes('backblazeb2.com') || p.imageUrl.includes('/file/'))) {
+        const parts = p.imageUrl.split('/');
+        const filename = parts[parts.length - 1];
+        
+        // Use ABSOLUTE URL for proxy so it hits the backend (port 3000) not frontend (port 4200)
+        // host includes port
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        p.imageUrl = `${baseUrl}/api/images/${filename}`;
+      }
+      return p;
+    });
+
+    console.log(`📦 Fetched ${transformedProducts.length} products`);
+    res.json(transformedProducts);
   } catch (error) {
     console.error('Error fetching products:', error);
     res.status(500).json({ error: 'Failed to fetch products' });
@@ -26,7 +44,16 @@ router.get('/:id', async (req, res) => {
       res.status(404).json({ error: 'Product not found' });
       return;
     }
-    res.json(product);
+
+    const p = product.toObject();
+    if (p.imageUrl && (p.imageUrl.includes('backblazeb2.com') || p.imageUrl.includes('/file/'))) {
+      const parts = p.imageUrl.split('/');
+      const filename = parts[parts.length - 1];
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      p.imageUrl = `${baseUrl}/api/images/${filename}`;
+    }
+
+    res.json(p);
   } catch (error) {
     console.error('Error fetching product:', error);
     res.status(500).json({ error: 'Failed to fetch product' });
@@ -52,10 +79,24 @@ router.post(
 
       if (req.file) {
         try {
+          console.log('📤 Uploading image to Backblaze B2...');
+          console.log('File details:', {
+            originalName: req.file.originalname,
+            mimetype: req.file.mimetype,
+            size: req.file.size,
+          });
+
           const fileName = `${Date.now()}-${req.file.originalname}`;
           imageUrl = await uploadFileToB2(fileName, req.file.buffer, req.file.mimetype);
+
+          console.log('✅ Image uploaded successfully to B2');
+          console.log('Image URL:', imageUrl);
         } catch (b2Error: any) {
-          console.error('Backblaze B2 upload error:', b2Error);
+          console.error('❌ Backblaze B2 upload error:', b2Error);
+          console.error('Error details:', {
+            message: b2Error.message,
+            stack: b2Error.stack,
+          });
           res.status(500).json({
             error:
               'Failed to upload image to Backblaze B2. Please check your B2 credentials in server/.env file.',
@@ -68,19 +109,52 @@ router.post(
         return;
       }
 
+      // Create product with image URL stored in MongoDB
+      console.log('💾 Saving product to MongoDB with imageUrl:', imageUrl);
+
+      if (!imageUrl || imageUrl.trim() === '') {
+        console.error('❌ imageUrl is empty, cannot save product');
+        res.status(500).json({ error: 'Failed to get image URL from Backblaze B2' });
+        return;
+      }
+
       const product = new Product({
         name,
         price: parseFloat(price),
         description,
         category,
-        imageUrl,
+        imageUrl, // This URL is stored in MongoDB and can be fetched later
       });
 
       await product.save();
+      console.log('✅ Product saved to MongoDB:', product._id);
+      console.log('Product imageUrl in DB:', product.imageUrl);
+      console.log('📋 Full product data:', JSON.stringify(product.toObject(), null, 2));
+
       res.status(201).json(product);
-    } catch (error) {
-      console.error('Error creating product:', error);
-      res.status(500).json({ error: 'Failed to create product' });
+    } catch (error: any) {
+      console.error('❌ Error creating product:', error);
+      console.error('Error stack:', error.stack);
+      console.error('Error message:', error.message);
+
+      // Provide more specific error messages
+      let errorMessage = 'Failed to create product';
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (error.name === 'ValidationError') {
+        errorMessage =
+          'Product validation failed: ' +
+          Object.values(error.errors)
+            .map((e: any) => e.message)
+            .join(', ');
+      } else if (error.name === 'MongoServerError') {
+        errorMessage = 'Database error: ' + error.message;
+      }
+
+      res.status(500).json({
+        error: errorMessage,
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      });
     }
   }
 );

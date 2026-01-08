@@ -30,26 +30,39 @@ const validateB2Credentials = (): void => {
   }
 };
 
-const b2 = new B2({
-  applicationKeyId: process.env.B2_APPLICATION_KEY_ID!,
-  applicationKey: process.env.B2_APPLICATION_KEY!,
-});
-
+// Lazy initialization: Create B2 instance only when needed (after dotenv is loaded)
+let b2: B2 | null = null;
 let authorized = false;
 let downloadUrl = '';
+
+const getB2Instance = (): B2 => {
+  if (!b2) {
+    // Validate credentials first
+    validateB2Credentials();
+
+    // Create B2 instance with environment variables (now loaded)
+    b2 = new B2({
+      applicationKeyId: process.env.B2_APPLICATION_KEY_ID!,
+      applicationKey: process.env.B2_APPLICATION_KEY!,
+    });
+  }
+  return b2;
+};
 
 export const authorizeB2 = async (): Promise<void> => {
   if (authorized) return;
 
-  // Validate credentials before attempting authorization
-  validateB2Credentials();
+  // Get B2 instance (will validate and create if needed)
+  const b2Instance = getB2Instance();
 
   try {
-    const authResponse = await b2.authorize();
+    const authResponse = await b2Instance.authorize();
     authorized = true;
-    // Store download URL for constructing public URLs
+    // Store download URL for constructing file URLs
     downloadUrl = authResponse.data.downloadUrl;
     console.log('✅ Backblaze B2 authorized successfully');
+    console.log('📋 Download URL:', downloadUrl);
+    console.log('💡 Note: Using fileId-based URLs for private bucket support');
   } catch (error: any) {
     console.error('❌ Backblaze B2 authorization error:', error.message);
 
@@ -83,34 +96,118 @@ export const uploadFileToB2 = async (
 ): Promise<string> => {
   await authorizeB2();
 
+  const b2Instance = getB2Instance();
+
   try {
+    console.log('🔍 Getting upload URL from B2...');
     // Get upload URL
-    const response = await b2.getUploadUrl({
+    const response = await b2Instance.getUploadUrl({
       bucketId: process.env.B2_BUCKET_ID!,
     });
+    console.log('✅ Got upload URL from B2');
 
     const filePath = `products/${fileName}`;
+    console.log('📁 File path:', filePath);
+    console.log('📏 File size:', fileBuffer.length, 'bytes');
 
     // Upload file
-    const uploadResponse = await b2.uploadFile({
+    console.log('📤 Uploading file to B2...');
+    const uploadResponse = await b2Instance.uploadFile({
       uploadUrl: response.data.uploadUrl,
       uploadAuthToken: response.data.authorizationToken,
       fileName: filePath,
       data: fileBuffer,
       mime: contentType,
     });
+    console.log('✅ File uploaded successfully');
 
-    // Construct public URL using download URL from authorization
-    // Format: https://f{fileId}.{downloadUrl}/file/{bucketName}/{filePath}
-    const fileId = uploadResponse.data.fileId;
+    const fileId = uploadResponse.data?.fileId;
+    if (!fileId) {
+      console.error('❌ fileId is missing from upload response:', uploadResponse);
+      throw new Error('File ID is missing from B2 upload response');
+    }
+    console.log('📋 File ID:', fileId);
     const bucketName = process.env.B2_BUCKET_NAME!;
 
-    // Use the download URL from authorization response
-    const fileUrl = `${downloadUrl}/file/${bucketName}/${filePath}`;
+    // For private buckets, use fileId-based URL format
+    // Format: https://f{fileId}.{domain}/file/{bucketName}/{filePath}
+    // This works for both public and private buckets
+    const cleanDownloadUrl = downloadUrl.endsWith('/') ? downloadUrl.slice(0, -1) : downloadUrl;
 
-    return fileUrl;
-  } catch (error) {
+    // Extract base domain from downloadUrl
+    // downloadUrl format: https://f005.backblazeb2.com
+    // We need: backblazeb2.com (remove the f### prefix)
+    let baseDomain: string;
+    const urlMatch = cleanDownloadUrl.match(/https?:\/\/f\d+\.(.+)/);
+
+    if (urlMatch && urlMatch[1]) {
+      // Extract base domain (e.g., "backblazeb2.com" from "f005.backblazeb2.com")
+      baseDomain = urlMatch[1];
+    } else {
+      // Fallback: try to extract domain after removing protocol
+      const withoutProtocol = cleanDownloadUrl.replace(/^https?:\/\//, '');
+      // Remove f### prefix if present
+      baseDomain = withoutProtocol.replace(/^f\d+\./, '');
+    }
+
+    if (!baseDomain) {
+      throw new Error(`Invalid downloadUrl format: ${downloadUrl}. Cannot extract base domain.`);
+    }
+
+    if (!fileId) {
+      throw new Error('File ID is missing from B2 upload response');
+    }
+
+    // For private buckets / CORS, we should use our own proxy
+    // Format: /api/images/{filePath} (which is products/filename)
+    // We only need the filename part since our proxy assumes 'products/' prefix or we pass the full path
+    
+    // The filename passed to this function is "products/timestamp-name"
+    // So we want the URL to be /api/images/timestamp-name
+    const fileNameOnly = filePath.replace('products/', '');
+    const proxyUrl = `/api/images/${fileNameOnly}`;
+
+    console.log('📎 Constructed proxy URL:', proxyUrl);
+    
+    return proxyUrl;
+  } catch (error: any) {
     console.error('❌ Error uploading file to B2:', error);
+    console.error('Error details:', {
+      message: error.message,
+      name: error.name,
+      stack: error.stack,
+    });
+
+    // Re-throw with more context
+    if (error.message) {
+      throw new Error(`Backblaze B2 upload failed: ${error.message}`);
+    }
+    throw error;
+  }
+};
+
+export const getFileStream = async (fileName: string): Promise<any> => {
+  await authorizeB2();
+  const b2Instance = getB2Instance();
+  
+  try {
+    const filePath = `products/${fileName}`;
+    console.log(`⬇️ Downloading file from B2: ${filePath}`);
+    
+    // downloadFileByName returns axios response with data as stream if requested
+    const response = await b2Instance.downloadFileByName({
+      bucketName: process.env.B2_BUCKET_NAME!,
+      fileName: filePath,
+      responseType: 'stream'
+    });
+    
+    return {
+      stream: response.data,
+      contentType: response.headers['content-type'],
+      contentLength: response.headers['content-length']
+    };
+  } catch (error) {
+    console.error('❌ Error downloading file from B2:', error);
     throw error;
   }
 };
@@ -118,11 +215,13 @@ export const uploadFileToB2 = async (
 export const deleteFileFromB2 = async (fileName: string): Promise<void> => {
   await authorizeB2();
 
+  const b2Instance = getB2Instance();
+
   try {
     const filePath = `products/${fileName}`;
 
     // List file versions to get the fileId
-    const fileInfo = await b2.listFileVersions({
+    const fileInfo = await b2Instance.listFileVersions({
       bucketId: process.env.B2_BUCKET_ID!,
       startFileName: filePath,
       maxFileCount: 1,
@@ -130,7 +229,7 @@ export const deleteFileFromB2 = async (fileName: string): Promise<void> => {
 
     if (fileInfo.data.files && fileInfo.data.files.length > 0) {
       const file = fileInfo.data.files[0];
-      await b2.deleteFileVersion({
+      await b2Instance.deleteFileVersion({
         fileId: file.fileId,
         fileName: file.fileName,
       });

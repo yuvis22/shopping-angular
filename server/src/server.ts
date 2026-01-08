@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { connectDatabase } from './config/database';
 import productRoutes from './routes/products';
+import imagesRoutes from './routes/images';
 
 dotenv.config();
 
@@ -51,11 +52,37 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
+// Routes
 app.use('/api/products', productRoutes);
+app.use('/api/images', imagesRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Test Backblaze B2 connection
+app.get('/test-b2', async (req, res) => {
+  try {
+    const { authorizeB2 } = await import('./config/backblaze');
+    await authorizeB2();
+    res.json({
+      status: 'success',
+      message: 'Backblaze B2 connection successful',
+      hasCredentials: !!(
+        process.env.B2_APPLICATION_KEY_ID &&
+        process.env.B2_APPLICATION_KEY &&
+        process.env.B2_BUCKET_ID &&
+        process.env.B2_BUCKET_NAME
+      ),
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Backblaze B2 connection failed',
+      error: error.message,
+    });
+  }
 });
 
 // Start server
